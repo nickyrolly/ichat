@@ -1,0 +1,89 @@
+package main
+
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
+func main() {
+	var wg sync.WaitGroup
+
+	taskChan := make(chan Task)
+	resultChan := make(chan string)
+	quit := make(chan bool)
+
+	tasks := []Task{
+		{ID: 1, Channel: "email", Content: "Halo email", Recipients: []string{"nicky,aira,arshya"}},
+		{ID: 2, Channel: "email", Content: "Halo email 2", Recipients: []string{"Udin, Regi, Dwi"}},
+		{ID: 2, Channel: "sms", Content: "SMS 2", Recipients: []string{"Udin, Regi, Dwi"}},
+		{ID: 1, Channel: "push", Content: "Halo notification 1", Recipients: []string{"nicky,aira,arshya"}},
+	}
+
+	wg.Add(1)
+	go processor(taskChan, resultChan, &wg, quit)
+	go func() {
+		for result := range resultChan {
+			fmt.Println("[Result] ", result)
+		}
+		fmt.Println("Reader goroutine selesai")
+	}()
+
+	for _, task := range tasks {
+		wg.Add(1)
+		go sender(task, taskChan, &wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(taskChan)
+		close(quit)
+	}()
+
+	fmt.Println("--- Task Channel Selesai ---")
+
+	// for task := range taskChan {
+	// 	fmt.Println("Task : ", task.Content)
+	// }
+
+	// for result := range resultChan {
+	// 	fmt.Println("[Result] ", result)
+	// }
+	time.Sleep(time.Second * 5)
+	fmt.Println("--- Selesai Sudah ---")
+
+}
+
+func processor(taskChan <-chan Task, resultChan chan<- string, wg *sync.WaitGroup, quit chan bool) {
+	defer wg.Done()
+	for {
+		select {
+		case task, ok := <-taskChan:
+			if !ok {
+				fmt.Println("taskChan ditutup, processor berhenti")
+				return // Keluar dari loop jika taskChan ditutup
+			}
+			// Simulate processing
+			time.Sleep(time.Millisecond * 500)
+			result := fmt.Sprintf("Task : %d, Content : %s, Processed Successfully", task.ID, task.Content)
+			resultChan <- result
+		case <-quit: // Cek sinyal quit
+			fmt.Println("processor menerima sinyal quit, berhenti")
+			return // Keluar dari loop jika menerima sinyal quit
+		}
+	}
+}
+
+func sender(task Task, ctask chan<- Task, wg *sync.WaitGroup) {
+	defer wg.Done()
+	fmt.Println("[TEST ]ID : ", task.ID, " ,Channel : ", task.Channel, " ,Content : ", task.Content)
+
+	ctask <- task
+}
+
+type Task struct {
+	ID         int
+	Channel    string // "email", "sms", "push"
+	Content    string
+	Recipients []string
+}

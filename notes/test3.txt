@@ -1,0 +1,49 @@
+package main
+
+import "fmt"
+
+func main() {
+
+	Arr1 := []int{1, 2, 3, 4, 5}
+	Arr2 := []int{3, 5, 6, 7}
+	Arr3 := []int{}
+
+	for _, v := range Arr1 {
+		val1 := v
+		for _, v2 := range Arr2 {
+			val2 := v2
+			if val1 == val2 {
+				Arr3 = append(Arr3, val1)
+				break
+			}
+		}
+	}
+
+	fmt.Printf("Hasil Akhir : %+v\n", Arr3)
+
+	fmt.Printf("Hasil Intersection : %+v\n", findInterserction(Arr1, Arr2))
+
+}
+
+func findInterserction(arr1, arr2 []int) []int {
+	var intersection []int
+
+	i := 0
+	j := 0
+
+	for i < len(arr1) && j < len(arr2) {
+		if arr1[i] == arr2[j] {
+			intersection = append(intersection, arr1[i])
+			i++
+			j++
+		} else if arr1[i] < arr2[j] {
+			i++
+		} else {
+			j++
+		}
+
+	}
+
+	return intersection
+
+}

@@ -1,0 +1,45 @@
+// Louise goes to the supermarket. She must buy exactly 100 fruits for exactly 100 dollars. Apples are $1.95, peaches are $1.50, oranges are $0.85. How many of each fruit does Louise buy?
+
+// Example:
+
+// Input: 1.95, 1.50, 0.85
+
+// Output: 3, 18, 79
+// Input: 1.95, 1.50,
+
+package main
+
+import "fmt"
+
+func main() {
+	targetFruits := 100
+	targetCost := 100.00
+	applePrice := 1.95
+	peachPrice := 1.50
+	orangePrice := 0.85
+
+	for apples := 0; apples <= targetFruits; apples++ {
+		for peaches := 0; peaches <= targetFruits-apples; peaches++ {
+			oranges := targetFruits - apples - peaches
+			if oranges >= 0 { // Pastikan jumlah oranges tidak negatif
+				totalCost := float64(apples)*applePrice + float64(peaches)*peachPrice + float64(oranges)*orangePrice
+
+				// Gunakan perbandingan yang lebih toleran terhadap floating-point inaccuracy
+				if abs(totalCost-targetCost) < 0.00001 {
+					fmt.Printf("Apples: %d, Peaches: %d, Oranges: %d\n", apples, peaches, oranges)
+					return // Hanya perlu satu solusi
+				}
+			}
+		}
+	}
+
+	fmt.Println("No solution found.") // Jika tidak ada solusi
+}
+
+// Fungsi untuk menghitung nilai absolut dari float64
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}

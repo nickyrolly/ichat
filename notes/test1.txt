@@ -1,0 +1,48 @@
+package main
+
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
+func main() {
+	taskSlice := make([]Task, 0, 10)
+
+	taskSlice = append(taskSlice, Task{1, "Task 1"})
+	taskSlice = append(taskSlice, Task{2, "Task 2"})
+	taskSlice = append(taskSlice, Task{3, "Task 3"})
+
+	fmt.Printf("Task : %+v\n", taskSlice)
+
+	c := make(chan string, len(taskSlice))
+
+	var wg sync.WaitGroup
+	for _, v := range taskSlice {
+		wg.Add(1)
+		go processTask(v, c, &wg)
+	}
+
+	wg.Wait()
+	close(c)
+
+	for result := range c {
+		fmt.Println(result)
+	}
+}
+
+type Task struct {
+	ID          int
+	Description string
+}
+
+func processTask(task Task, c chan string, wg *sync.WaitGroup) {
+	// procesString := fmt.Sprint("Processing task : ", task.ID)
+	defer wg.Done()
+	fmt.Printf("Memulai pemrosesan tugas ID: %d, Deskripsi: %s\n", task.ID, task.Description)
+
+	time.Sleep(time.Duration(task.ID) * 500 * time.Millisecond)
+	descString := fmt.Sprintf("Task processed : %+v\n ", task.Description)
+
+	c <- descString
+}

@@ -1,0 +1,47 @@
+package main
+
+import "fmt"
+
+func main() {
+	arr1 := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	target := 10
+
+	index := BinarySearch(arr1, target)
+
+	fmt.Println("Hasil pencarian : ", arr1[index])
+
+}
+
+func BinarySearch(arr1 []int, target int) int {
+
+	left := 0
+	right := len(arr1) - 1
+
+	for left <= right {
+
+		mid := left + (right-left)/2
+
+		midValue := arr1[mid]
+
+		if midValue == target {
+			return mid
+		}
+
+		if midValue < target {
+			left = mid + 1
+		} else {
+			right = mid - 1
+		}
+
+	}
+
+	return -1
+}
+
+spreadsheet -> venue_sectors
+
+kalau bayar -> event_tickets
+
+
+
+kalau booking (belum bayar) -> event_seatmap_books

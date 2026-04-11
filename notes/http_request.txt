@@ -1,0 +1,169 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"strconv"
+)
+
+// Model Product
+type Product struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// Model Buyer
+type Buyer struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	City string `json:"city"`
+}
+
+// Data simulasi (biasanya dari database)
+var products = []Product{
+	{ID: 1, Name: "Laptop", Description: "Powerful laptop for work"},
+	{ID: 2, Name: "Mouse", Description: "Ergonomic wireless mouse"},
+	{ID: 3, Name: "Keyboard", Description: "Mechanical keyboard"},
+}
+
+var buyers = []Buyer{
+	{ID: 101, Name: "Alice", City: "Jakarta"},
+	{ID: 102, Name: "Bob", City: "Surabaya"},
+	{ID: 103, Name: "Charlie", City: "Bandung"},
+}
+
+// Relasi sederhana: buyer membeli product (bisa diganti dengan tabel order/purchase)
+var buyerProductRelations = map[int][]int{ // buyerID: []productIDs
+	101: {1, 2},
+	102: {2},
+	103: {1, 3},
+}
+
+// Handler: GET /products
+func getProductsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(products)
+}
+
+// Handler: GET /products/{id}
+func getProductHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	idStr := r.URL.Path[len("/products/"):]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid Product ID", http.StatusBadRequest)
+		return
+	}
+
+	for _, p := range products {
+		if p.ID == id {
+			json.NewEncoder(w).Encode(p)
+			return
+		}
+	}
+
+	http.Error(w, "Product Not Found", http.StatusNotFound)
+}
+
+// Handler: GET /buyers
+func getBuyersHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(buyers)
+}
+
+// Handler: GET /buyers/{id}
+func getBuyerHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	idStr := r.URL.Path[len("/buyers/"):]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid Buyer ID", http.StatusBadRequest)
+		return
+	}
+
+	for _, b := range buyers {
+		if b.ID == id {
+			json.NewEncoder(w).Encode(b)
+			return
+		}
+	}
+
+	http.Error(w, "Buyer Not Found", http.StatusNotFound)
+}
+
+// Handler: GET /buyers/{id}/products
+func getBuyerProductsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	idStr := r.URL.Path[len("/buyers/") : len("/buyers/")+len(strconv.Itoa(buyers[0].ID))] // Ambil bagian ID
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid Buyer ID", http.StatusBadRequest)
+		return
+	}
+
+	productIDs, ok := buyerProductRelations[id] // Cari produk yang dibeli buyer ini
+	if !ok {
+		json.NewEncoder(w).Encode([]Product{}) // Kirim array kosong jika tidak ada
+		return
+	}
+
+	boughtProducts := []Product{}
+	for _, productID := range productIDs {
+		for _, p := range products {
+			if p.ID == productID {
+				boughtProducts = append(boughtProducts, p)
+				break
+			}
+		}
+	}
+
+	json.NewEncoder(w).Encode(boughtProducts)
+}
+
+// Handler: GET /products/{id}/buyers
+func getProductBuyersHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	idStr := r.URL.Path[len("/products/") : len("/products/")+len(strconv.Itoa(products[0].ID))]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid Product ID", http.StatusBadRequest)
+		return
+	}
+
+	buyerIDs := []int{}
+	for buyerID, productIDs := range buyerProductRelations { // Cari buyer yang membeli produk ini
+		for _, productID := range productIDs {
+			if productID == id {
+				buyerIDs = append(buyerIDs, buyerID)
+				break
+			}
+		}
+	}
+
+	buyingBuyers := []Buyer{}
+	for _, buyerID := range buyerIDs {
+		for _, b := range buyers {
+			if b.ID == buyerID {
+				buyingBuyers = append(buyingBuyers, b)
+				break
+			}
+		}
+	}
+
+	json.NewEncoder(w).Encode(buyingBuyers)
+}
+
+func main() {
+	http.HandleFunc("/products", getProductsHandler)
+	http.HandleFunc("/products/", getProductHandler)
+	http.HandleFunc("/buyers", getBuyersHandler)
+	http.HandleFunc("/buyers/", getBuyerHandler)
+	http.HandleFunc("/buyers/", getBuyerProductsHandler)   // /buyers/{id}/products
+	http.HandleFunc("/products/", getProductBuyersHandler) // /products/{id}/buyers
+
+	fmt.Println("Server listening on port 8080...")
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}

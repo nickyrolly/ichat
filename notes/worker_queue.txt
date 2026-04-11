@@ -1,0 +1,90 @@
+package main
+
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
+type Task struct {
+	ID          int
+	Priority    int
+	Description string
+}
+
+func main() {
+	var wg sync.WaitGroup
+
+	jobQueue := make(chan Task)
+	quit := make(chan bool)
+
+	numWorkers := 3 // Jumlah worker goroutine
+
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go worker(i, jobQueue, quit, &wg)
+	}
+
+	tasks := []Task{
+		{1, 1, "Priority 1"},
+		{2, 2, "Priority 2"},
+		{3, 3, "Priority 3"},
+		{4, 1, "Priority 1 - Another"},
+		{5, 3, "Priority 3"},
+		{6, 2, "Priority 2"},
+	}
+
+	for _, task := range tasks {
+		go func(t Task) {
+			select {
+			case jobQueue <- t:
+			case <-time.After(5 * time.Second):
+				fmt.Println("Task", t.ID, "timed out")
+			}
+		}(task)
+	}
+
+	go func() {
+		wg.Wait()
+		close(jobQueue)
+		close(quit)
+	}()
+
+	time.Sleep(10 * time.Second) // Let workers finish
+	fmt.Println("Selesai")
+}
+
+func worker(id int, jobQueue <-chan Task, quit <-chan bool, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	priorityQueues := map[int][]Task{
+		1: {},
+		2: {},
+		3: {},
+	}
+
+	for {
+		select {
+		case <-quit:
+			fmt.Println("Worker", id, "shutting down")
+			return
+		case task, ok := <-jobQueue:
+			if !ok {
+				fmt.Println("Job queue closed, Worker", id, "exiting")
+				return
+			}
+			priorityQueues[task.Priority] = append(priorityQueues[task.Priority], task)
+
+			// Process tasks based on priority
+			for p := 1; p <= 3; p++ {
+				if len(priorityQueues[p]) > 0 {
+					taskToProcess := priorityQueues[p][0]
+					priorityQueues[p] = priorityQueues[p][1:]
+
+					fmt.Println("Worker", id, "processing Task", taskToProcess.ID, "with priority", taskToProcess.Priority)
+					time.Sleep(2 * time.Second) // Simulate processing
+				}
+			}
+		}
+	}
+}

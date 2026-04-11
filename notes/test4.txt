@@ -1,0 +1,71 @@
+package main
+
+import (
+	"fmt"
+	"sort"
+	"sync"
+)
+
+func concurrentBinarySearch(arr []int, target int, numGoroutines int) int {
+	if len(arr) == 0 {
+		return -1
+	}
+
+	if numGoroutines > len(arr) {
+		numGoroutines = len(arr) // Batasi jumlah goroutine
+	}
+
+	results := make(chan int, numGoroutines)
+	var wg sync.WaitGroup
+	chunkSize := len(arr) / numGoroutines
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		start := i * chunkSize
+		end := start + chunkSize
+		if i == numGoroutines-1 {
+			end = len(arr) // Tangani sisa elemen
+		}
+		go func(subArr []int, target int) {
+			defer wg.Done()
+			index := binarySearch(subArr, target) // Fungsi binarySearch biasa
+			if index != -1 {
+				results <- start + index // Sesuaikan indeks
+			} else {
+				results <- -1
+			}
+		}(arr[start:end], target)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	finalIndex := -1
+	for index := range results {
+		if index != -1 {
+			finalIndex = index
+			break
+		}
+	}
+
+	return finalIndex
+}
+
+func binarySearch(arr []int, target int) int {
+	// Implementasi binary search biasa
+	// ...
+
+	return 0
+}
+
+func main() {
+	arr := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+	sort.Ints(arr)
+	target := 10
+	numGoroutines := 4
+
+	index := concurrentBinarySearch(arr, target, numGoroutines)
+	fmt.Printf("Target %d found at index: %d\n", target, index) // Output: Target 10 found at index: 9
+}

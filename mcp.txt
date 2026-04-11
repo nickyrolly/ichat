@@ -1,0 +1,68 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/casbin/casbin/v2"
+)
+
+// var enforcer *casbin.Enforcer
+
+func main() {
+	// Create an enforcer
+	enforcer, err := casbin.NewEnforcer("model.conf")
+	if err != nil {
+		fmt.Printf("Error creating enforcer: %v\n", err)
+		return
+	}
+
+	// Add roles and permissions
+	// Let's create two roles: admin and user
+	// Admin can do everything, user can only read
+	enforcer.AddPolicy("admin", "document", "read")
+	enforcer.AddPolicy("admin", "document", "write")
+	enforcer.AddPolicy("user", "document", "read")
+
+	http.Handle("/document", authzMiddleware(http.HandlerFunc(documentHandler), enforcer))
+
+	log.Println("Server started at : 8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
+
+	// testEnforce(enforcer)
+
+}
+
+func authzMiddleware(next http.Handler, enforcer *casbin.Enforcer) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sub := r.URL.Query().Get("sub")
+		obj := r.URL.Query().Get("obj")
+		act := r.URL.Query().Get("act")
+
+		fmt.Println("Sub : ", sub, " ,obj : ", obj, " ,act : ", act)
+
+		allowed, err := enforcer.Enforce(sub, obj, act)
+		if err != nil {
+			fmt.Println("-- error")
+			http.Error(w, fmt.Sprintf("Error enforcing policy: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		if !allowed {
+			fmt.Println("-- not allowed")
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+
+}
+
+func documentHandler(w http.ResponseWriter, r *http.Request) {
+	resp := map[string]string{"message": "You are authorized to access the document"}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
