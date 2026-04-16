@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/nickyrolly/ichat/internal/database"
+	"github.com/nickyrolly/ichat/internal/repository"
 )
 
 // TribunData merepresentasikan "table1" dengan ID unik.
@@ -27,60 +29,182 @@ type KursiData struct {
 	TribunID   uuid.UUID
 }
 
+// func main() {
+// 	// Nama file CSV yang akan dibaca
+// 	// Perbarui nama file sesuai dengan yang Anda unggah, yaitu "tribun_mapping_real.csv"
+// 	filename := "cmd/tribun_mapping_real.csv"
+
+// 	// Membaca data dari file CSV
+// 	records, err := bacaFileCSV(filename)
+// 	if err != nil {
+// 		log.Fatalf("Gagal membaca file CSV: %v", err)
+// 	}
+
+// 	// Mengolah data CSV menjadi dua grup data
+// 	table1, table2 := prosesDataCSV(records)
+
+// 	fmt.Printf("Berhasil memuat %d tribun dan %d kursi dari CSV.\n", len(table1), len(table2))
+
+// 	// Membuat endpoint API
+// 	http.HandleFunc("/api/seats", func(w http.ResponseWriter, r *http.Request) {
+// 		w.Header().Set("Content-Type", "application/json")
+
+// 		response := map[string]interface{}{
+// 			"total_tribun": len(table1),
+// 			"total_kursi":  len(table2),
+// 			"status":       "success",
+// 		}
+
+// 		json.NewEncoder(w).Encode(response)
+// 	})
+
+// 	// Menjalankan HTTP server di port 8081 (karena 8080 mungkin sudah dipakai ws-chat)
+// 	port := ":8081"
+// 	fmt.Printf("Server API berjalan di http://localhost%s\n", port)
+
+// 	if err := http.ListenAndServe(port, nil); err != nil {
+// 		log.Fatalf("Gagal menjalankan server: %v", err)
+// 	}
+
+// 	// // Mencetak hasil untuk table1 (Daftar Tribun)
+// 	// fmt.Println("Grup 1: List Data Tribun (table1)")
+// 	// fmt.Println("-------------------------------------------------")
+// 	// for _, tribun := range table1 {
+// 	// 	fmt.Printf("ID: %s, Nama: %s\n", tribun.ID, tribun.Nama)
+// 	// }
+// 	// fmt.Println("-------------------------------------------------")
+// 	// fmt.Printf("Total tribun unik: %d\n\n", len(table1))
+
+// 	// // Mencetak hasil untuk table2 (Daftar Kursi)
+// 	// fmt.Println("Grup 2: List Data Kursi (table2)")
+// 	// fmt.Println("-------------------------------------------------")
+// 	// for _, kursi := range table2 {
+// 	// 	fmt.Printf("ID: %s, Baris: %d, Kursi: %d, TribunID: %s\n", kursi.ID, kursi.Baris, kursi.NomorKursi, kursi.TribunID)
+// 	// }
+// 	// fmt.Println("-------------------------------------------------")
+// 	// fmt.Printf("Total kursi: %d\n", len(table2))
+// }
+
 func main() {
-	// Nama file CSV yang akan dibaca
-	// Perbarui nama file sesuai dengan yang Anda unggah, yaitu "tribun_mapping_real.csv"
-	filename := "cmd/tribun_mapping_real.csv"
+	// Connect to database
+	db, err := database.NewConnection()
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	// Initialize repositories
+	tribunRepo := repository.NewTribunRepository(db)
+	kursiRepo := repository.NewKursiRepository(db)
 
 	// Membaca data dari file CSV
+	filename := "cmd/tribun_mapping_real.csv"
 	records, err := bacaFileCSV(filename)
 	if err != nil {
-		log.Fatalf("Gagal membaca file CSV: %v", err)
+		log.Printf("Warning: Failed to read CSV file: %v", err)
+		log.Println("Using database data instead...")
+	} else {
+		// Mengolah data CSV menjadi dua grup data
+		table1, table2 := prosesDataCSV(records)
+		fmt.Printf("Berhasil memuat %d tribun dan %d kursi dari CSV nya.\n", len(table1), len(table2))
 	}
-
-	// Mengolah data CSV menjadi dua grup data
-	table1, table2 := prosesDataCSV(records)
-
-	fmt.Printf("Berhasil memuat %d tribun dan %d kursi dari CSV.\n", len(table1), len(table2))
 
 	// Membuat endpoint API
 	http.HandleFunc("/api/seats", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
+		// Get data from database
+		tribunCount, err := tribunRepo.GetCount()
+		if err != nil {
+			http.Error(w, "Failed to get tribun count", http.StatusInternalServerError)
+			return
+		}
+
+		kursiCount, err := kursiRepo.GetCount()
+		if err != nil {
+			http.Error(w, "Failed to get kursi count", http.StatusInternalServerError)
+			return
+		}
+
 		response := map[string]interface{}{
-			"total_tribun": len(table1),
-			"total_kursi":  len(table2),
+			"total_tribun": tribunCount,
+			"total_kursi":  kursiCount,
 			"status":       "success",
+			"source":       "database",
 		}
 
 		json.NewEncoder(w).Encode(response)
 	})
 
-	// Menjalankan HTTP server di port 8081 (karena 8080 mungkin sudah dipakai ws-chat)
+	// Additional endpoints
+	http.HandleFunc("/api/tribun", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		tribuns, err := tribunRepo.GetAll()
+		if err != nil {
+			http.Error(w, "Failed to get tribuns", http.StatusInternalServerError)
+			return
+		}
+
+		json.NewEncoder(w).Encode(tribuns)
+	})
+
+	http.HandleFunc("/api/kursi", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		kursis, err := kursiRepo.GetAll()
+		if err != nil {
+			http.Error(w, "Failed to get kursis", http.StatusInternalServerError)
+			return
+		}
+
+		json.NewEncoder(w).Encode(kursis)
+	})
+
+	// Menjalankan HTTP server di port 8081
 	port := ":8081"
 	fmt.Printf("Server API berjalan di http://localhost%s\n", port)
 
 	if err := http.ListenAndServe(port, nil); err != nil {
 		log.Fatalf("Gagal menjalankan server: %v", err)
 	}
+}
 
-	// // Mencetak hasil untuk table1 (Daftar Tribun)
-	// fmt.Println("Grup 1: List Data Tribun (table1)")
-	// fmt.Println("-------------------------------------------------")
-	// for _, tribun := range table1 {
-	// 	fmt.Printf("ID: %s, Nama: %s\n", tribun.ID, tribun.Nama)
-	// }
-	// fmt.Println("-------------------------------------------------")
-	// fmt.Printf("Total tribun unik: %d\n\n", len(table1))
+func prosesDataCSV(records [][]string) ([]TribunData, []KursiData) {
+	var table1 []TribunData
+	var table2 []KursiData
+	tribunMap := make(map[string]uuid.UUID)
 
-	// // Mencetak hasil untuk table2 (Daftar Kursi)
-	// fmt.Println("Grup 2: List Data Kursi (table2)")
-	// fmt.Println("-------------------------------------------------")
-	// for _, kursi := range table2 {
-	// 	fmt.Printf("ID: %s, Baris: %d, Kursi: %d, TribunID: %s\n", kursi.ID, kursi.Baris, kursi.NomorKursi, kursi.TribunID)
-	// }
-	// fmt.Println("-------------------------------------------------")
-	// fmt.Printf("Total kursi: %d\n", len(table2))
+	for i, record := range records {
+		if i == 0 {
+			continue // Skip header
+		}
+
+		tribunNama := strings.TrimSpace(record[0])
+		baris, _ := strconv.Atoi(strings.TrimSpace(record[1]))
+		nomorKursi, _ := strconv.Atoi(strings.TrimSpace(record[2]))
+
+		// Cek apakah tribun sudah ada di map
+		tribunID, exists := tribunMap[tribunNama]
+		if !exists {
+			tribunID = uuid.New()
+			tribunMap[tribunNama] = tribunID
+			table1 = append(table1, TribunData{
+				ID:   tribunID,
+				Nama: tribunNama,
+			})
+		}
+
+		// Tambahkan kursi
+		table2 = append(table2, KursiData{
+			ID:         uuid.New(),
+			Baris:      baris,
+			NomorKursi: nomorKursi,
+			TribunID:   tribunID,
+		})
+	}
+
+	return table1, table2
 }
 
 // bacaFileCSV adalah fungsi untuk membaca data dari file CSV.
@@ -128,68 +252,68 @@ func parseRentangKursi(rentang string) (int, int, error) {
 }
 
 // prosesDataCSV mengolah data dari CSV menjadi dua slice baru: TribunData dan KursiData.
-func prosesDataCSV(records [][]string) ([]TribunData, []KursiData) {
-	var table1 []TribunData
-	var table2 []KursiData
+// func prosesDataCSV(records [][]string) ([]TribunData, []KursiData) {
+// 	var table1 []TribunData
+// 	var table2 []KursiData
 
-	tribunMap := make(map[string]uuid.UUID)
+// 	tribunMap := make(map[string]uuid.UUID)
 
-	if len(records) <= 1 {
-		return table1, table2
-	}
+// 	if len(records) <= 1 {
+// 		return table1, table2
+// 	}
 
-	for _, record := range records[1:] {
-		// Asumsi format CSV:
-		// Kolom 0: Nama Tribun
-		// Kolom 1: Nomor Baris
-		// Kolom 2: Rentang Nomor Kursi
-		if len(record) < 3 {
-			continue
-		}
+// 	for _, record := range records[1:] {
+// 		// Asumsi format CSV:
+// 		// Kolom 0: Nama Tribun
+// 		// Kolom 1: Nomor Baris
+// 		// Kolom 2: Rentang Nomor Kursi
+// 		if len(record) < 3 {
+// 			continue
+// 		}
 
-		tribunNama := record[0]
-		barisNomorStr := record[1]
-		nomorKursiStr := record[2]
+// 		tribunNama := record[0]
+// 		barisNomorStr := record[1]
+// 		nomorKursiStr := record[2]
 
-		// Mengabaikan baris yang tidak memiliki informasi yang valid
-		if tribunNama == "" || barisNomorStr == "" || nomorKursiStr == "" || nomorKursiStr == "-" {
-			continue
-		}
+// 		// Mengabaikan baris yang tidak memiliki informasi yang valid
+// 		if tribunNama == "" || barisNomorStr == "" || nomorKursiStr == "" || nomorKursiStr == "-" {
+// 			continue
+// 		}
 
-		// Mendapatkan atau membuat TribunID
-		var tribunID uuid.UUID
-		if id, ok := tribunMap[tribunNama]; !ok {
-			newID := uuid.New()
-			tribunMap[tribunNama] = newID
-			table1 = append(table1, TribunData{ID: newID, Nama: tribunNama})
-			tribunID = newID
-		} else {
-			tribunID = id
-		}
+// 		// Mendapatkan atau membuat TribunID
+// 		var tribunID uuid.UUID
+// 		if id, ok := tribunMap[tribunNama]; !ok {
+// 			newID := uuid.New()
+// 			tribunMap[tribunNama] = newID
+// 			table1 = append(table1, TribunData{ID: newID, Nama: tribunNama})
+// 			tribunID = newID
+// 		} else {
+// 			tribunID = id
+// 		}
 
-		barisNomor, err := strconv.Atoi(barisNomorStr)
-		if err != nil {
-			log.Printf("Gagal mengkonversi nomor baris '%s': %v\n", barisNomorStr, err)
-			continue
-		}
+// 		barisNomor, err := strconv.Atoi(barisNomorStr)
+// 		if err != nil {
+// 			log.Printf("Gagal mengkonversi nomor baris '%s': %v\n", barisNomorStr, err)
+// 			continue
+// 		}
 
-		mulaiKursi, akhirKursi, err := parseRentangKursi(nomorKursiStr)
-		if err != nil {
-			log.Printf("Gagal mem-parsing rentang kursi '%s': %v\n", nomorKursiStr, err)
-			continue
-		}
+// 		mulaiKursi, akhirKursi, err := parseRentangKursi(nomorKursiStr)
+// 		if err != nil {
+// 			log.Printf("Gagal mem-parsing rentang kursi '%s': %v\n", nomorKursiStr, err)
+// 			continue
+// 		}
 
-		// Membuat setiap kursi dalam rentang dan menambahkannya ke table2
-		for i := mulaiKursi; i <= akhirKursi; i++ {
-			kursiID := uuid.New()
-			table2 = append(table2, KursiData{
-				ID:         kursiID,
-				Baris:      barisNomor,
-				NomorKursi: i,
-				TribunID:   tribunID,
-			})
-		}
-	}
+// 		// Membuat setiap kursi dalam rentang dan menambahkannya ke table2
+// 		for i := mulaiKursi; i <= akhirKursi; i++ {
+// 			kursiID := uuid.New()
+// 			table2 = append(table2, KursiData{
+// 				ID:         kursiID,
+// 				Baris:      barisNomor,
+// 				NomorKursi: i,
+// 				TribunID:   tribunID,
+// 			})
+// 		}
+// 	}
 
-	return table1, table2
-}
+// 	return table1, table2
+// }

@@ -1,5 +1,5 @@
 # Build Stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 COPY go.mod go.sum ./
@@ -11,5 +11,6 @@ RUN go build -o main cmd/app.go
 FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/main .
-EXPOSE 8080
+COPY --from=builder /app/cmd/tribun_mapping_real.csv ./cmd/
+EXPOSE 8081
 CMD ["./main"]
