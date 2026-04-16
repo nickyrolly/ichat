@@ -1,0 +1,2 @@
+DELETE FROM kursi;
+DELETE FROM tribun;
