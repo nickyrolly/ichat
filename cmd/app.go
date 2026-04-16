@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/nickyrolly/ichat/internal/database"
 	"github.com/nickyrolly/ichat/internal/repository"
+	"github.com/spf13/viper"
 )
 
 // TribunData merepresentasikan "table1" dengan ID unik.
@@ -89,13 +90,39 @@ type KursiData struct {
 // }
 
 func runMigrations() {
+	viper.SetConfigName(".env")
+	viper.SetConfigType("env")
+	viper.AddConfigPath(".")
+	viper.AutomaticEnv()
+
+	viper.SetDefault("DB_HOST", "127.0.0.1")
+	viper.SetDefault("DB_PORT", "5432")
+	viper.SetDefault("DB_USER", "postgres")
+	viper.SetDefault("DB_PASSWORD", "")
+	viper.SetDefault("DB_NAME", "ichat")
+
+	if err := viper.ReadInConfig(); err != nil {
+		log.Println("Warning: .env file not found for migration")
+	}
+
+	host := viper.GetString("DB_HOST")
+	port := viper.GetString("DB_PORT")
+	user := viper.GetString("DB_USER")
+	password := viper.GetString("DB_PASSWORD")
+	dbname := viper.GetString("DB_NAME")
+
+	// dbURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+	// 	os.Getenv("DB_USER"),
+	// 	os.Getenv("DB_PASSWORD"),
+	// 	os.Getenv("DB_HOST"),
+	// 	os.Getenv("DB_PORT"),
+	// 	os.Getenv("DB_NAME"),
+	// )
+
 	dbURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_NAME"),
-	)
+		user, password, host, port, dbname)
+
+	log.Printf("Migration URL: postgres://%s:***@%s:%s/%s?sslmode=disable", user, host, port, dbname)
 
 	m, err := migrate.New("file://migrations", dbURL)
 	if err != nil {
