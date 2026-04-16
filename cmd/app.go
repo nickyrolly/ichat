@@ -10,6 +10,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 	"github.com/nickyrolly/ichat/internal/database"
 	"github.com/nickyrolly/ichat/internal/repository"
@@ -85,7 +88,33 @@ type KursiData struct {
 // 	// fmt.Printf("Total kursi: %d\n", len(table2))
 // }
 
+func runMigrations() {
+	dbURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("DB_NAME"),
+	)
+
+	m, err := migrate.New("file://migrations", dbURL)
+	if err != nil {
+		log.Printf("Migration setup error: %v", err)
+		return
+	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Printf("Migration error: %v", err)
+		return
+	}
+
+	log.Println("Migrations completed successfully")
+}
+
 func main() {
+	// Run migrations first
+	runMigrations()
+
 	// Connect to database
 	db, err := database.NewConnection()
 	if err != nil {
