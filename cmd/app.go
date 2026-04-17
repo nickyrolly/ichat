@@ -153,19 +153,23 @@ func main() {
 	tribunRepo := repository.NewTribunRepository(db)
 	kursiRepo := repository.NewKursiRepository(db)
 
-	// Membaca data dari file CSV
-	filename := "cmd/tribun_mapping_real.csv"
-	records, err := bacaFileCSV(filename)
-	if err != nil {
-		log.Printf("Warning: Failed to read CSV file: %v", err)
-		log.Println("Using database data instead...")
-	} else {
-		// Mengolah data CSV menjadi dua grup data
-		table1, table2 := prosesDataCSV(records)
-		fmt.Printf("Berhasil memuat %d tribun dan %d kursi dari CSV nya.\n", len(table1), len(table2))
-	}
+	log.Println("Berhasil terhubung ke database. Menyiapkan endpoint HTTP...")
 
-	// Membuat endpoint API
+	// // Membaca data dari file CSV
+	// filename := "cmd/tribun_mapping_real.csv"
+	// records, err := bacaFileCSV(filename)
+	// if err != nil {
+	// 	log.Printf("Warning: Failed to read CSV file: %v", err)
+	// 	log.Println("Using database data instead...")
+	// } else {
+	// 	// Mengolah data CSV menjadi dua grup data
+	// 	table1, table2 := prosesDataCSV(records)
+	// 	fmt.Printf("Berhasil memuat %d tribun dan %d kursi dari CSV nya.\n", len(table1), len(table2))
+	// }
+
+	// ---------------------
+	// HTTP ROUTER SECTION
+	// ---------------------
 	http.HandleFunc("/api/seats", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -217,7 +221,9 @@ func main() {
 		json.NewEncoder(w).Encode(kursis)
 	})
 
-	// Menjalankan HTTP server di port 8081
+	// ---------------------
+	// RUNNING SERVER
+	// ---------------------
 	port := ":8081"
 	fmt.Printf("Server API berjalan di http://localhost%s\n", port)
 
